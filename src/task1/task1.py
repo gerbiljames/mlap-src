@@ -3,41 +3,52 @@ import numpy
 import scipy.optimize
 
 
-def loadfile(filepath):
+def loadfile(file_path):
 
-    filecontents = []
+    file_contents = []
 
-    with open(filepath) as datafile:
+    with open(file_path) as datafile:
         reader = csv.reader(datafile)
 
         for row in reader:
-            filecontents += [row]
+            file_contents += [row]
 
-    return filecontents
+    return file_contents
 
 
 def compile_data(file_content):
 
-    data = []
+    compiled_data = []
 
     for i in xrange(10, len(file_content) - 1):
 
+        current_price = float(file_content[i][1])
+
         prev_data = file_content[i - 10: i]
 
-        # This flattens the list and creates two arrays, one for price, the other for previous days data.
-        data += [[float(file_content[i][1]), [float(item) for sublist in prev_data for item in sublist]]]
+        features = []
 
-    return data
+        features += [float(item[1]) for item in prev_data]  # Adds the 10 previous days prices as features.
+
+        # row_data += [float(item[0]) for item in prev_data]  # Adds the 10 previous days volume as features.
+
+        features += [1]  # Adds a constant feature.
+
+        compiled_data_row = [current_price, features]
+
+        compiled_data += [compiled_data_row]
+
+    return compiled_data
 
 
 def generate_training_data(data):
 
-    return data[1::2]
+    return data[0::2]
 
 
 def generate_test_data(data):
 
-    return data[0::2]
+    return data[1::2]
 
 
 def calculate_mean_sq_error(theta, data):
@@ -52,17 +63,24 @@ def calculate_mean_sq_error(theta, data):
     return total_sq_error
 
 
-def linear(file):
+def generate_theta_zero(data):
 
-    theta0 = [0] * 20
+    return [0] * len(data[0][1])
 
-    file_content = loadfile(file)
+
+def linear(file_path):
+
+    file_content = loadfile(file_path)
 
     data = compile_data(file_content)
+
+    theta0 = generate_theta_zero(data)
 
     training_data = generate_training_data(data)
 
     result = scipy.optimize.fmin(calculate_mean_sq_error, x0=theta0, args=tuple([training_data]))
+
+    print "Theta = " + str(result)
 
     return calculate_mean_sq_error(result, generate_test_data(data))
 
