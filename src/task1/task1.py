@@ -207,7 +207,7 @@ def classifier_error(theta, data, classes):
 
 def generate_theta_zero(data, classes=1):
 
-    return [[0] * len(data[0][-1]) * classes]
+    return [[0] * len(get_features(data[0])) * classes]
 
 
 def perform_linear_regression(training_data, test_data):
