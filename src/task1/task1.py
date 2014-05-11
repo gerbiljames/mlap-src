@@ -30,9 +30,9 @@ def generate_features(data):
 
     # features += [float(data[9][1]) - float(data[0][1])]  # Adds the rate of change of price over prev 10 days as a feature
 
-    # features += [float(item[0]) for item in data]  # Adds the 10 previous days volume as features.
+    # features += [float(item[0]) / 10000.0 for item in data]  # Adds the 10 previous days volume as features.
 
-    # features += [1]  # Adds a constant feature.
+    features += [1]  # Adds a constant feature.
 
     return features
 
@@ -119,16 +119,59 @@ def get_price(data_row):
     return data_row[0]
 
 
-def mean_sq_error(theta, data):
+def sq_error(theta, data):
 
     total_sq_error = 0
 
     for data_row in data:
+
         total_sq_error += (numpy.dot(theta, get_features(data_row)) - get_price(data_row)) ** 2
 
-    total_sq_error /= float(len(data))
+    return total_sq_error
+
+
+def sq_error_grad(theta, data):
+
+    error_grad = [0] * get_features_size(data)
+
+    for data_row in data:
+
+        error_grad += 2 * numpy.dot(get_features(data_row), numpy.dot(theta, get_features(data_row)) - get_price(data_row))
+
+    return error_grad
+
+
+def mean_sq_error(theta, data):
+
+    squared_error = sq_error(theta, data)
+
+    return squared_error / float(len(data))
+
+
+def sq_error_ridge(theta, lambda_value, data):
+
+    total_sq_error = 0
+
+    for data_row in data:
+
+        total_sq_error += (lambda_value * ((numpy.dot(theta, get_features(data_row)) - get_price(data_row)) ** 2))
+
+    total_sq_error += ((1 - lambda_value) * sum(theta) ** 2)
 
     return total_sq_error
+
+
+def sq_error_ridge_grad(theta, lambda_value, data):
+
+    total_sq_error_grad = [0] * get_features_size(data)
+
+    for data_row in data:
+
+        total_sq_error_grad += 2 * lambda_value * (numpy.dot(get_features(data_row), numpy.dot(theta, get_features(data_row)) - get_price(data_row)))
+
+    total_sq_error_grad += ((1 - lambda_value) * theta)
+
+    return total_sq_error_grad
 
 
 def get_theta_for_class(theta, class_index, features):
@@ -207,14 +250,14 @@ def classifier_error(theta, data, classes):
 
 def generate_theta_zero(data, classes=1):
 
-    return [[0] * len(get_features(data[0])) * classes]
+    return [0] * len(get_features(data[0])) * classes
 
 
 def perform_linear_regression(training_data, test_data):
 
     theta0 = generate_theta_zero(training_data)
 
-    result = scipy.optimize.fmin(mean_sq_error, x0=theta0, args=tuple([training_data]), disp=False)
+    result = scipy.optimize.fmin_bfgs(sq_error, x0=theta0, fprime=sq_error_grad, args=tuple([training_data]), disp=False)
 
     error = mean_sq_error(result, test_data)
 
@@ -232,6 +275,46 @@ def perform_logistic_regression(training_data, test_data):
     error = classifier_error(result, test_data, classes)
 
     return error
+
+
+def perform_lambda_iteration(lambda_value, theta0, data0, data1):
+
+    result0 = scipy.optimize.fmin_bfgs(sq_error_ridge, x0=theta0, fprime=sq_error_ridge_grad, args=(lambda_value, data0), disp=False)
+
+    error0 = mean_sq_error(result0, data1)
+
+    result1 = scipy.optimize.fmin_bfgs(sq_error_ridge, x0=theta0, fprime=sq_error_ridge_grad, args=(lambda_value, data1), disp=False)
+
+    error1 = mean_sq_error(result1, data0)
+
+    error = (error0 + error1) / 2.0
+
+    return error
+
+
+def perform_linear_regression_regularized(training_data, test_data):
+
+    theta0 = generate_theta_zero(training_data)
+
+    best_error = float("inf")
+
+    best_lambda = 0
+
+    for i in xrange(0, 100):
+
+        lambda_value = i / 1000.0
+
+        error = perform_lambda_iteration(lambda_value, theta0, training_data, test_data)
+
+        print str(lambda_value) + " = " + str(error)
+
+        if error < best_error:
+
+            best_error = error
+
+            best_lambda = lambda_value
+
+    return best_error, best_lambda
 
 
 def linear(file_path):
@@ -264,5 +347,20 @@ def logistic(file_path):
     return (result0 + result1) / 2
 
 
-print "Mean Squared Error   = " + str(linear("../../data/stock_price.csv"))
-print "Hard Classifer Error = " + str(logistic("../../data/stock_price.csv"))
+def reglinear(file_path):
+
+    file_content = load_file(file_path)
+
+    data = compile_data_linear(file_content)
+
+    folded_data = generate_data_folds(data)
+
+    result = perform_linear_regression_regularized(folded_data[0], folded_data[1])
+
+    print "Best Lambda = " + str(result[1])
+
+    return result[0]
+
+# print "Mean Squared Error   = " + str(linear("../../data/stock_price.csv"))
+# print "Hard Classifer Error = " + str(logistic("../../data/stock_price.csv"))
+print "Mean Squared Error   = " + str(reglinear("../../data/stock_price.csv"))
