@@ -32,7 +32,7 @@ def generate_features(data):
 
     # features += [float(item[0]) / 10000.0 for item in data]  # Adds the 10 previous days volume as features.
 
-    features += [1]  # Adds a constant feature.
+    # features += [1]  # Adds a constant feature.
 
     return features
 
@@ -189,6 +189,27 @@ def get_class(data_row):
     return data_row[1]
 
 
+def calculate_row_estimation_logarithmic(theta, data_row, classes, features_size):
+
+    row_class = get_class(data_row)
+
+    features = get_features(data_row)
+
+    current_features_dot_thetas = numpy.dot(features, get_theta_for_class(theta, row_class, features_size))
+
+    max_feature = max(features)
+
+    features_dot_thetas = []
+
+    for clazz in range(classes):
+
+        features_dot_thetas.append(numpy.dot(features, get_theta_for_class(theta, clazz, features_size)) - max_feature)
+
+    sum_features_dot_thetas = max_feature + scipy.misc.logsumexp(features_dot_thetas)
+
+    return current_features_dot_thetas - sum_features_dot_thetas
+
+
 def classifier_estimation_logarithmic(theta, data, classes):
 
     estimation = 0
@@ -197,25 +218,7 @@ def classifier_estimation_logarithmic(theta, data, classes):
 
     for data_row in data:
 
-        row_class = get_class(data_row)
-
-        features = get_features(data_row)
-
-        current_features_dot_thetas = numpy.dot(features, get_theta_for_class(theta, row_class, features_size))
-
-        max_feature = max(features)
-
-        features_dot_thetas = []
-
-        for clazz in range(classes):
-
-            features_dot_thetas.append(numpy.dot(features, get_theta_for_class(theta, clazz, features_size)) - max_feature)
-
-        sum_features_dot_thetas = max_feature + scipy.misc.logsumexp(features_dot_thetas)
-
-        current_estimation = current_features_dot_thetas - sum_features_dot_thetas
-
-        estimation -= current_estimation
+        estimation -= calculate_row_estimation_logarithmic(theta, data_row, classes, features_size)
 
     return estimation
 
@@ -267,9 +270,27 @@ def classifier_estimation_logarithmic_grad(theta, data, classes):
     return classifier_grad
 
 
-def classifier_error(theta, data, classes):
+def classifier_estimation_logarithmic_ridge(theta, lambda_value, data, classes):
 
-    error = 0
+    estimation = lambda_value * classifier_estimation_logarithmic(theta, data, classes)
+
+    estimation -= ((1 - lambda_value) * sum(theta ** 2))
+
+    return estimation
+
+
+def classifier_estimation_logarithmic_ridge_grad(theta, lambda_value, data, classes):
+
+    grad = lambda_value * classifier_estimation_logarithmic_grad(theta, data, classes)
+
+    grad += 2 * ((1 - lambda_value) * theta)
+
+    return grad
+
+
+def classifier_accuracy(theta, data, classes):
+
+    correct = 0
 
     features_size = get_features_size(data)
 
@@ -280,6 +301,7 @@ def classifier_error(theta, data, classes):
         sum_exp_features_dot_theta = 0
 
         for clazz in range(classes):
+
             sum_exp_features_dot_theta += numpy.exp(numpy.dot(get_features(data_row), get_theta_for_class(theta, clazz, features_size)))
 
         for clazz in range(classes):
@@ -289,10 +311,10 @@ def classifier_error(theta, data, classes):
 
         predicted_class = computed_probabilities.index(max(computed_probabilities))
 
-        if predicted_class != get_class(data_row):
-            error += 1
+        if predicted_class == get_class(data_row):
+            correct += 1
 
-    return error / float(len(data))
+    return correct / float(len(data))
 
 
 def generate_theta_zero(data, classes=1):
@@ -317,14 +339,14 @@ def perform_logistic_regression(training_data, test_data):
 
     theta0 = generate_theta_zero(training_data, classes=classes)
 
-    result = scipy.optimize.fmin_bfgs(classifier_estimation_logarithmic, x0=theta0, fprime=classifier_estimation_logarithmic_grad, args=(training_data, classes), disp=False)
+    result = scipy.optimize.fmin_bfgs(classifier_estimation_logarithmic, fprime=classifier_estimation_logarithmic_grad, x0=theta0, args=(training_data, classes), disp=False)
 
-    error = classifier_error(result, test_data, classes)
+    error = classifier_accuracy(result, test_data, classes)
 
     return error
 
 
-def perform_lambda_iteration(lambda_value, theta0, data0, data1):
+def perform_lambda_iteration_linear(lambda_value, theta0, data0, data1):
 
     result0 = scipy.optimize.fmin_bfgs(sq_error_ridge, x0=theta0, fprime=sq_error_ridge_grad, args=(lambda_value, data0), disp=False)
 
@@ -333,6 +355,21 @@ def perform_lambda_iteration(lambda_value, theta0, data0, data1):
     result1 = scipy.optimize.fmin_bfgs(sq_error_ridge, x0=theta0, fprime=sq_error_ridge_grad, args=(lambda_value, data1), disp=False)
 
     error1 = mean_sq_error(result1, data0)
+
+    error = (error0 + error1) / 2.0
+
+    return error
+
+
+def perform_lambda_iteration_logistic(lambda_value, theta0, data0, data1, classes):
+
+    result0 = scipy.optimize.fmin_bfgs(classifier_estimation_logarithmic_ridge, fprime=classifier_estimation_logarithmic_ridge_grad, x0=theta0, args=(lambda_value, data0, classes), disp=False)
+
+    error0 = classifier_accuracy(result0, data1, classes)
+
+    result1 = scipy.optimize.fmin_bfgs(classifier_estimation_logarithmic_ridge, fprime=classifier_estimation_logarithmic_ridge_grad, x0=theta0, args=(lambda_value, data1, classes), disp=False)
+
+    error1 = classifier_accuracy(result1, data0, classes)
 
     error = (error0 + error1) / 2.0
 
@@ -351,7 +388,7 @@ def perform_linear_regression_regularized(training_data, test_data):
 
         lambda_value = i / 1000.0
 
-        error = perform_lambda_iteration(lambda_value, theta0, training_data, test_data)
+        error = perform_lambda_iteration_linear(lambda_value, theta0, training_data, test_data)
 
         print str(lambda_value) + " = " + str(error)
 
@@ -362,6 +399,33 @@ def perform_linear_regression_regularized(training_data, test_data):
             best_lambda = lambda_value
 
     return best_error, best_lambda
+
+
+def perform_logistic_regression_regularized(data0, data1):
+
+    classes = 5
+
+    theta0 = generate_theta_zero(data0, classes=classes)
+
+    best_accuracy = 0
+
+    best_lambda = 0
+
+    for i in xrange(0, 11):
+
+        lambda_value = i / 10.0
+
+        accuracy = perform_lambda_iteration_logistic(lambda_value, theta0, data0, data1, classes)
+
+        print str(lambda_value) + " = " + str(accuracy)
+
+        if accuracy > best_accuracy:
+
+            best_accuracy = accuracy
+
+            best_lambda = lambda_value
+
+    return best_accuracy, best_lambda
 
 
 def linear(file_path):
@@ -406,6 +470,21 @@ def reglinear(file_path):
 
     return result[0]
 
-# print "Mean Squared Error   = " + str(linear("../../data/stock_price.csv"))
-print "Hard Classifer Error = " + str(logistic("../../data/stock_price.csv"))
-# print "Mean Squared Error   = " + str(reglinear("../../data/stock_price.csv"))
+
+def reglogistic(file_path):
+
+    file_content = load_file(file_path)
+
+    data = compile_data_logistic(file_content)
+
+    folded_data = generate_data_folds(data)
+
+    result = perform_logistic_regression_regularized(folded_data[0], folded_data[1])
+
+    return result[0]
+
+
+# print "Mean Squared Error  = " + str(linear("../../data/stock_price.csv"))
+# print "Hard Classifier Accuracy = " + str(logistic("../../data/stock_price.csv"))
+# print "Mean Squared Error  = " + str(reglinear("../../data/stock_price.csv"))
+print "Hard Classifier Accuracy = " + str(reglogistic("../../data/stock_price.csv"))
