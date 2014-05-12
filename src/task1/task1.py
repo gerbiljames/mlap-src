@@ -220,6 +220,53 @@ def classifier_estimation_logarithmic(theta, data, classes):
     return estimation
 
 
+def indicate(has_class, is_class):
+
+    if has_class == is_class:
+        return 1
+    else:
+        return 0
+
+
+def classifier_estimation_logarithmic_grad(theta, data, classes):
+
+    classifier_grad = [0] * len(theta)
+
+    features_size = get_features_size(data)
+
+    for data_row in data:
+
+        row_class = get_class(data_row)
+
+        features = get_features(data_row)
+
+        features_dot_thetas = []
+
+        for clazz in range(classes):
+
+            features_dot_thetas.append(numpy.dot(features, get_theta_for_class(theta, clazz, features_size)))
+
+        sum_features_dot_thetas = sum(numpy.exp(features_dot_thetas))
+
+        current_grad_list = []
+
+        for clazz in range(classes):
+
+            current_features_dot_thetas = numpy.dot(features, numpy.exp(numpy.dot(features, get_theta_for_class(theta, clazz, features_size))))
+
+            current_estimation = current_features_dot_thetas / sum_features_dot_thetas
+
+            current_grad_element = numpy.dot(features, indicate(clazz, row_class)) - current_estimation
+
+            current_grad_list.append(current_grad_element)
+
+        flattened_grad = [y for x in current_grad_list for y in x]
+
+        classifier_grad = numpy.add(classifier_grad, flattened_grad)
+
+    return classifier_grad
+
+
 def classifier_error(theta, data, classes):
 
     error = 0
@@ -270,7 +317,7 @@ def perform_logistic_regression(training_data, test_data):
 
     theta0 = generate_theta_zero(training_data, classes=classes)
 
-    result = scipy.optimize.fmin(classifier_estimation_logarithmic, x0=theta0, args=(training_data, classes), disp=False)
+    result = scipy.optimize.fmin_bfgs(classifier_estimation_logarithmic, x0=theta0, fprime=classifier_estimation_logarithmic_grad, args=(training_data, classes), disp=False)
 
     error = classifier_error(result, test_data, classes)
 
@@ -357,10 +404,8 @@ def reglinear(file_path):
 
     result = perform_linear_regression_regularized(folded_data[0], folded_data[1])
 
-    print "Best Lambda = " + str(result[1])
-
     return result[0]
 
 # print "Mean Squared Error   = " + str(linear("../../data/stock_price.csv"))
-# print "Hard Classifer Error = " + str(logistic("../../data/stock_price.csv"))
-print "Mean Squared Error   = " + str(reglinear("../../data/stock_price.csv"))
+print "Hard Classifer Error = " + str(logistic("../../data/stock_price.csv"))
+# print "Mean Squared Error   = " + str(reglinear("../../data/stock_price.csv"))
