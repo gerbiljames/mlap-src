@@ -18,7 +18,7 @@ def load_file(structure_file_path):
 
 
 def get_prior_distribution():
-    return [0.5, 0.5]
+    return [1, 1]
 
 
 def generate_parent_structure(child_structure):
@@ -63,6 +63,8 @@ def generate_distributions_for_node(node_id, data, bn_structure):
     if len(permutations) == 0:
         permutations = [0]
 
+    permutation_data = []
+
     for permutation in permutations:
 
         current_counts = get_prior_distribution()
@@ -72,7 +74,9 @@ def generate_distributions_for_node(node_id, data, bn_structure):
             if is_valid_data_row(data_row, parents, permutation):
                 current_counts[data_row[node_id]] += 1
 
-        distribution_data.append(generate_beta_distribution_mean(current_counts[1], current_counts[0]))
+        permutation_data.append(generate_beta_distribution_mean(current_counts[1], current_counts[0]))
+
+    distribution_data.append(permutation_data)
 
     return distribution_data
 
@@ -129,7 +133,7 @@ def get_permutation_index(parent_values):
 
 
 def get_distribution_mean_at_permutation_index(index, node):
-    return node[2 + index]
+    return node[2][index]
 
 
 def get_parent_truth_values(node, data_row):
