@@ -30,7 +30,7 @@ def generate_features(data):
 
     # features += [float(data[9][1]) ** 2]  # Adds the previous days price squared as a feature.
 
-    # features += [float(data[8][1])]  # Adds the stock price from two days ago as a feature.
+    features += [float(data[8][1])]  # Adds the stock price from two days ago as a feature.
 
     # features += [(float(data[9][1]) - float(data[8][1]))]  # Adds the rate of change of price over prev 2 days as a feature
 
@@ -354,11 +354,11 @@ def perform_logistic_regression(training_data, test_data):
 
 def perform_lambda_iteration_linear(lambda_value, theta0, data0, data1):
 
-    result0 = scipy.optimize.fmin_bfgs(sq_error_ridge, x0=theta0, fprime=sq_error_ridge_grad, args=(lambda_value, data0), disp=False)
+    result0 = scipy.optimize.fmin_bfgs(sq_error_ridge, x0=theta0, fprime=sq_error_ridge_grad, args=(lambda_value, data0), disp=False, maxiter=10)
 
     error0 = mean_sq_error(result0, data1)
 
-    result1 = scipy.optimize.fmin_bfgs(sq_error_ridge, x0=theta0, fprime=sq_error_ridge_grad, args=(lambda_value, data1), disp=False)
+    result1 = scipy.optimize.fmin_bfgs(sq_error_ridge, x0=theta0, fprime=sq_error_ridge_grad, args=(lambda_value, data1), disp=False, maxiter=10)
 
     error1 = mean_sq_error(result1, data0)
 
@@ -369,11 +369,11 @@ def perform_lambda_iteration_linear(lambda_value, theta0, data0, data1):
 
 def perform_lambda_iteration_logistic(lambda_value, theta0, data0, data1, classes):
 
-    result0 = scipy.optimize.fmin(classifier_estimation_logarithmic_ridge, x0=theta0, args=(lambda_value, data0, classes), disp=False)
+    result0 = scipy.optimize.fmin(classifier_estimation_logarithmic_ridge, x0=theta0, args=(lambda_value, data0, classes), disp=False, maxiter=10)
 
     error0 = classifier_accuracy(result0, data1, classes)
 
-    result1 = scipy.optimize.fmin(classifier_estimation_logarithmic_ridge, x0=theta0, args=(lambda_value, data1, classes), disp=False)
+    result1 = scipy.optimize.fmin(classifier_estimation_logarithmic_ridge, x0=theta0, args=(lambda_value, data1, classes), disp=False, maxiter=10)
 
     error1 = classifier_accuracy(result1, data0, classes)
 
@@ -390,11 +390,13 @@ def perform_linear_regression_regularized(training_data, test_data):
 
     best_lambda = 0
 
-    for i in xrange(0, 100):
+    for i in xrange(100):
 
-        lambda_value = i / 1000.0
+        lambda_value = i / 100.0
 
         error = perform_lambda_iteration_linear(lambda_value, theta0, training_data, test_data)
+
+        print str(lambda_value) + " = " + str(error)
 
         if error < best_error:
 
@@ -415,11 +417,13 @@ def perform_logistic_regression_regularized(data0, data1):
 
     best_lambda = 0
 
-    for i in xrange(0, 11):
+    for i in xrange(0, 100):
 
-        lambda_value = i / 10.0
+        lambda_value = i / 100.0
 
         accuracy = perform_lambda_iteration_logistic(lambda_value, theta0, data0, data1, classes)
+
+        print str(lambda_value) + " = " + str(accuracy)
 
         if accuracy > best_accuracy:
 
@@ -484,9 +488,3 @@ def reglogistic(file_path):
     result = perform_logistic_regression_regularized(folded_data[0], folded_data[1])
 
     return result[0]
-
-
-# print "Mean Squared Error  = " + str(linear("../../data/stock_price.csv"))
-print "Hard Classifier Accuracy = " + str(logistic("../../data/stock_price.csv"))
-# print "Mean Squared Error  = " + str(reglinear("../../data/stock_price.csv"))
-# print "Hard Classifier Accuracy = " + str(reglogistic("../../data/stock_price.csv"))
