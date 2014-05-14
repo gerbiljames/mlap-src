@@ -192,7 +192,7 @@ def find_distribution_mean(data_row, node):
 def generate_data_row(ordered_fitted_bn):
     """ Randomly generates a single row of data for a given network structure.
     """
-    data_row = [0 for _ in range(len(ordered_fitted_bn))]
+    data_row = [-1 for _ in range(len(ordered_fitted_bn))]
 
     for node in ordered_fitted_bn:
 
@@ -256,23 +256,3 @@ def bnsample(fitted_bn, n_samples):
     shuffled_nodes = shuffle_node_order(fitted_bn)
 
     return generate_data(shuffled_nodes, n_samples)
-
-
-# DELETE BELOW THIS LINE #
-
-bayes_net_spec = bnbayesfit("../../data/bnstruct.csv", "../../data/bndata.csv")
-
-for thing in bayes_net_spec:
-    print thing
-
-generated_sample = bnsample(bayes_net_spec, 10000)
-
-structure = load_file("../../data/bnstruct.csv")
-
-structure_fixed = generate_parent_structure(structure)
-
-generated_bayes_net_spec = generate_distributions(generated_sample, structure_fixed)
-print
-
-for thing in generated_bayes_net_spec:
-    print thing
